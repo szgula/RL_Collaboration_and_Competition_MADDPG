@@ -10,8 +10,8 @@ import supporting_functions
 
 REWARD_MULTIPLICATION = 1
 EXPECTED_SCORE = 1 * REWARD_MULTIPLICATION
-VISUALIZE = False
-ENABLE_TRAINING = True
+VISUALIZE = True
+ENABLE_TRAINING = False
 
 def maddpg(env, agents, brain_name, n_episodes=10000, max_t=300, print_every=10):
     scores_deque = deque(maxlen=100)
@@ -51,20 +51,21 @@ def maddpg(env, agents, brain_name, n_episodes=10000, max_t=300, print_every=10)
     return scores, i_episode
 
 
-def run_trained_agent(env, agent, brain_name):
+def run_trained_agent(env, agents, brain_name):
     env_info = env.reset(train_mode=False)[brain_name]
 
     states = env_info.vector_observations
-    agent.reset()
-    while True:
-        actions = agent.act(states)
-        env_info = env.step(actions)[brain_name]
-        next_states = env_info.vector_observations
-        rewards = env_info.rewards
-        dones = env_info.local_done
-        states = next_states
-        if any(dones):
-            break 
+    [agent.reset() for agent in agents]
+    for _ in range(10):
+        while True:
+            actions = [agent.act(states[i]) for i, agent in enumerate(agents)]
+            env_info = env.step(actions)[brain_name]
+            next_states = env_info.vector_observations
+            rewards = env_info.rewards
+            dones = env_info.local_done
+            states = next_states
+            if any(dones):
+                break
 
 
 def main():
@@ -98,9 +99,14 @@ def main():
         supporting_functions.plot_average_score(scores, title)
 
     if not(ENABLE_TRAINING):
+        for agent_idx in range(agents[0].number_of_agents):
+            agents[agent_idx].actor_local.load_state_dict(
+                torch.load('mmddpg_checkpoint_actor_{}.pth'.format(agent_idx)))
+            agents[agent_idx].critic_local.load_state_dict(
+                torch.load('mmddpg_checkpoint_critic_{}.pth'.format(agent_idx)))
         run_trained_agent(env, agents, brain_name)
 
-    supporting_functions.save_algorithm_parameters(agents, title, time_to_learn)
+    #supporting_functions.save_algorithm_parameters(agents, title, time_to_learn)
 
 
 if __name__ == "__main__":
