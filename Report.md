@@ -12,7 +12,7 @@ When the ball hits the ground the agent on which side it happened gets -0.005 re
 
 ## Learning Algorithm
 
-To solve Tennis environment I decided to use multi-agent DDPG (MADDPG) algorithm. To reduce code repetition I have implemented the MADDPG on top of the DDPG algorithm, which I implemented to solve Reacher environment.
+To solve Tennis environment I decided to use multi-agent DDPG (MADDPG) algorithm. To reduce code repetition I have implemented the MADDPG on top of the DDPG algorithm, which I implemented to solve Reacher environment: (https://github.com/szgula/continuous_control_DDPG).
 
 The neural network models behind my solution are:
 

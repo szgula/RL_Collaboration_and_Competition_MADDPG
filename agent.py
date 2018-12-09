@@ -16,7 +16,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class Agent:
-    """Interacts with and learns from the environment."""
+    """Interacts with and learns from the environment: this is taken from my previous project: continuous control DDPG:
+    https://github.com/szgula/continuous_control_DDPG """
 
     def __init__(self, state_size, action_size, number_of_independednt_agents, random_seed, enable_priority=False, BUFFER_SIZE=int(1e5), BATCH_SIZE=128, GAMMA=0.99, TAU=1e-3, LR_ACTOR=1e-5, LR_CRITIC=1e-4, WEIGHT_DECAY=0, index_of_agent_in_maddpg=None):
         """Initialize an Agent object.
@@ -121,100 +122,6 @@ class Agent:
         self.actor_local.load_state_dict(torch.load('checkpoint_actor.pth'))
 
 
-class myDDPG(Agent):
-        def __init__(self, state_size, action_size, random_seed, enable_priority=False,
-                 BUFFER_SIZE=int(1e5),
-                 BATCH_SIZE=128, GAMMA=0.99, TAU=1e-3, LR_ACTOR=1e-5, LR_CRITIC=1e-4, WEIGHT_DECAY=0,
-                 index_of_agent_in_maddpg=None):
-            super().__init__(state_size, action_size, 1, random_seed,
-                             enable_priority, BUFFER_SIZE, BATCH_SIZE,
-                             GAMMA, TAU, LR_ACTOR, LR_CRITIC, WEIGHT_DECAY)
-
-        def step(self, states, actions, rewards, next_states, dones):
-            """ agent_index is only used for MADDPG - it is index of current agent in other input arguments"""
-            """Save experience in replay memory, and use random sample from buffer to learn."""
-            # Save experience / reward
-
-            for s, a, r, ns, d in zip(states, actions, rewards, next_states, dones):
-                error = self.get_priority(s, a, r, ns, d)
-                self.memory.add(s, a, r, ns, d, priority=error)
-
-            # Learn, if enough samples are available in memory
-            if len(self.memory) > self.BATCH_SIZE:
-                for _ in range(self.UPDATE_STEPS):
-                    experiences = self.memory.sample()
-                    self.learn(experiences, self.GAMMA)
-
-        def learn(self, experiences, gamma):
-            """Update policy and value parameters using given batch of experience tuples.
-            Q_targets = r + γ * critic_target(next_state, actor_target(next_state))
-            where:
-                actor_target(state) -> action
-                critic_target(state, action) -> Q-value
-            Params
-            ======
-                experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples
-                gamma (float): discount factor
-            """
-            states, actions, rewards, next_states, dones = experiences
-
-            # ---------------------------- update critic ---------------------------- #
-            # Get predicted next-state actions and Q values from target models
-            actions_next = self.actor_target(next_states)
-            Q_targets_next = self.critic_target(next_states, actions_next)
-            # Compute Q targets for current states (y_i)
-            Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
-            # Compute critic loss
-            Q_expected = self.critic_local(states, actions)
-            critic_loss = F.mse_loss(Q_expected, Q_targets)
-            # Minimize the loss
-            self.critic_optimizer.zero_grad()
-            critic_loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.critic_local.parameters(), 1)
-            self.critic_optimizer.step()
-
-            # ---------------------------- update actor ---------------------------- #
-            # Compute actor loss
-            actions_pred = self.actor_local(states)
-            actor_loss = -self.critic_local(states, actions_pred).mean()
-            # Minimize the loss
-            self.actor_optimizer.zero_grad()
-            actor_loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.actor_local.parameters(), 1)
-            self.actor_optimizer.step()
-
-            # ----------------------- update target networks ----------------------- #
-            self.soft_update(self.critic_local, self.critic_target, self.TAU)
-            self.soft_update(self.actor_local, self.actor_target, self.TAU)
-
-        def get_priority(self, s, a, r, ns, d):
-            if isinstance(self.memory, ReplayBufferPrioritized):
-                next_state_cp = np.copy(ns)
-                state_cp = np.copy(s)
-                action_cp = np.copy(a)
-
-                next_state_cp.resize(1, self.state_size)
-                state_cp.resize(1, self.state_size)
-                action_cp.resize(1, self.action_size)
-
-                next_state_tourch = torch.from_numpy(next_state_cp).float().to(device)
-                action_next = self.actor_target(next_state_tourch)
-                Q_targets_next = self.critic_target(next_state_tourch, action_next)
-                Q_targets = torch.tensor(r) + (self.GAMMA * Q_targets_next * (1 - d))
-
-                state_tourch = torch.from_numpy(state_cp).float().to(device)
-                action_tourch = torch.from_numpy(action_cp).float().to(device)
-                Q_expected = self.critic_local(state_tourch, action_tourch)
-                priority = abs((Q_expected - Q_targets).item())
-                priority += self.MIN_PRIORITY
-            else:
-                priority = [1 for _ in range(a.size)]
-
-            if (self.max_priority_value < priority):
-                print('max_priority: {:.4f}'.format(priority))
-                self.max_priority_value = priority
-            return priority
-
 
 class myMADDPG(Agent):
     def __init__(self, state_size, action_size, number_of_independednt_agents, random_seed, enable_priority_2=False,
@@ -242,8 +149,8 @@ class myMADDPG(Agent):
         next_states = next_states.flatten()
         self.memory.add(states, actions, rewards, next_states, dones, priority=error)
         if sum(rewards) > 0:
-            #for _ in range(4):
-            self.memory.add(states, actions, rewards, next_states, dones, priority=error)
+            for _ in range(4):
+                self.memory.add(states, actions, rewards, next_states, dones, priority=error)
 
         # Learn, if enough samples are available in memory
         if len(self.memory) > self.BATCH_SIZE:
