@@ -10,8 +10,9 @@ import supporting_functions
 
 REWARD_MULTIPLICATION = 1
 EXPECTED_SCORE = 1 * REWARD_MULTIPLICATION
-VISUALIZE = True
+VISUALIZE = False
 ENABLE_TRAINING = False
+LOAD_PRETRAINED_DATA = True
 
 def maddpg(env, agents, brain_name, n_episodes=10000, max_t=300, print_every=10):
     scores_deque = deque(maxlen=100)
@@ -58,7 +59,7 @@ def run_trained_agent(env, agents, brain_name):
     [agent.reset() for agent in agents]
     for _ in range(10):
         while True:
-            actions = [agent.act(states[i]) for i, agent in enumerate(agents)]
+            actions = [agent.act(states[i], False) for i, agent in enumerate(agents)]
             env_info = env.step(actions)[brain_name]
             next_states = env_info.vector_observations
             rewards = env_info.rewards
@@ -91,6 +92,14 @@ def main():
 
     agents = [myMADDPG(obs_size, action_size, num_agents, 0, index_of_agent_in_maddpg=agent_idx) for agent_idx in
               range(num_agents)]
+
+    if LOAD_PRETRAINED_DATA:
+        for agent_idx in range(agents[0].number_of_agents):
+            agents[agent_idx].actor_local.load_state_dict(
+                torch.load('mmddpg_checkpoint_actor_{}.pth'.format(agent_idx)))
+            agents[agent_idx].critic_local.load_state_dict(
+                torch.load('mmddpg_checkpoint_critic_{}.pth'.format(agent_idx)))
+
     if ENABLE_TRAINING:
         [agent.set_other_agents(agents) for agent in agents]
         scores, time_to_learn = maddpg(env, agents, brain_name)
@@ -99,11 +108,6 @@ def main():
         supporting_functions.plot_average_score(scores, title)
 
     if not(ENABLE_TRAINING):
-        for agent_idx in range(agents[0].number_of_agents):
-            agents[agent_idx].actor_local.load_state_dict(
-                torch.load('mmddpg_checkpoint_actor_{}.pth'.format(agent_idx)))
-            agents[agent_idx].critic_local.load_state_dict(
-                torch.load('mmddpg_checkpoint_critic_{}.pth'.format(agent_idx)))
         run_trained_agent(env, agents, brain_name)
 
     #supporting_functions.save_algorithm_parameters(agents, title, time_to_learn)
